@@ -19,15 +19,17 @@ Passeword : `azerty`
 
   - `AppShiny.R`: Script principal pour lancer l'application **Shiny**.
   - `AppShiny_Packages.R`: Script permettant d'installer les packages R requis pour l'application.
-- `R_Markown/`: Fichier permettant d'inqtaller le RMarkdown
-  - `www/`: Dossier contenant le fichier CSS pour styliser le RMarkdown.
-    - `R_Markdown.css`: Fichier CSS pour la personnalisation de le RMarkdown.
-  - `rapport_dpe`: Script principal pour lancer le script **RMarkdown**.
+
 - `Documentation/`: Dossier contenant la documentation associée à l'application.
   - `Documentation Fonctionnelle de l'application.pdf`: Guide fonctionnel décrivant les fonctionnalités principales de l'application.
   - `Documentation technique de l'application.pdf`: Documentation technique détaillant la structure du code et les technologies utilisées.
 
-- `README.md`: Ce fichier décrivant l'application et fournissant les instructions d'installation.
+- `R_Markown/`: Fichier permettant d'inqtaller le RMarkdown
+  - `www/`: Dossier contenant le fichier CSS pour styliser le RMarkdown.
+    - `R_Markdown.css`: Fichier CSS pour la personnalisation de le RMarkdown.
+  - `rapport_dpe`: Script principal pour lancer le script **RMarkdown**.
+  - 
+- `README.md`: Ce fichier décrivant l'application et fournissant les instructions d'installation.  
   
 - `URL de l'App`: Ce fichier permet d'acceder a l'App via un URL.
 
