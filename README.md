@@ -28,7 +28,7 @@ Passeword : `azerty`
   - `www/`: Dossier contenant le fichier CSS pour styliser le RMarkdown.
     - `R_Markdown.css`: Fichier CSS pour la personnalisation de le RMarkdown.
   - `rapport_dpe`: Script principal pour lancer le script **RMarkdown**.
-  - 
+    
 - `README.md`: Ce fichier décrivant l'application et fournissant les instructions d'installation.  
   
 - `URL de l'App`: Ce fichier permet d'acceder a l'App via un URL.
