@@ -1,0 +1,309 @@
+---
+title: "Étude des Performances Énergétiques des Logements - Département 69"
+author: "Nino & Leonard"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: lumen
+    highlight: tango
+    number_sections: true
+    df_print: paged
+    css: "www/Rmdcss.css"
+
+---
+  
+# Introduction
+
+<div class="introduction">
+La transition énergétique est un enjeu crucial pour la lutte contre le changement climatique. Les bâtiments résidentiels jouent un rôle clé dans cette transition, et leur performance énergétique est mesurée à travers le Diagnostic de Performance Énergétique (DPE). Le DPE évalue l'efficacité énergétique des logements sur une échelle de A (très performant) à G (peu performant).
+
+Cette étude se concentre sur l'analyse des logements neufs et anciens du département 69 (Rhône). L'objectif est d'examiner les différences de performances énergétiques entre ces deux types de logements, ainsi que d'analyser les corrélations entre les coûts énergétiques et d'autres variables telles que la surface habitable. En identifiant les zones d'amélioration potentielles, cette étude vise à proposer des recommandations pertinentes pour favoriser des pratiques de construction plus durables et énergétiquement efficaces.
+</div>
+
+## Objectifs de l'étude
+
+<div class="objectives">
+Les principaux objectifs de cette analyse sont :
+  
+1. **Identifier les tendances énergétiques des logements** en fonction de l'étiquette DPE.
+2. **Explorer les corrélations** entre les coûts énergétiques, la surface habitable, et d'autres variables clés.
+3. **Proposer des recommandations** en matière de politiques publiques ou de réhabilitation énergétique.
+</div>
+
+---
+  
+# Données et Méthodologie
+
+<div class="methodology">
+Les données utilisées dans cette étude proviennent de l'API ADEME, qui fournit des informations sur les Diagnostics de Performance Énergétique (DPE) des logements dans le département 69. Les données ont été récupérées pour les logements existants et neufs, et comprennent des informations sur l'étiquette DPE, la surface habitable, le coût de chauffage, et la localisation géographique.
+</div>
+
+## Importation et Préparation des Données
+
+<div class="data-preparation">
+Nous avons récupéré deux jeux de données distincts via l'API ADEME : un pour les logements existants et un autre pour les logements neufs. Les deux jeux de données ont été fusionnés pour permettre une analyse combinée. Nous avons également converti les coordonnées géographiques de Lambert-93 en WGS84 pour visualiser les logements sur une carte interactive.
+</div>
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# Chargement des bibliothèques nécessaires
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(corrplot)
+library(httr)
+library(jsonlite)
+library(sp)
+library(knitr)
+
+# Fonction de conversion Lambert-93 vers WGS84
+convert_lambert93_to_wgs84 <- function(x, y) {
+  coords <- data.frame(x = as.numeric(x), y = as.numeric(y))
+  coordinates(coords) <- c("x", "y")
+  proj4string(coords) <- CRS("+init=epsg:2154")  # Lambert-93
+  coords <- spTransform(coords, CRS("+proj=longlat +datum=WGS84"))  # WGS84
+  return(data.frame(lon = coordinates(coords)[, 1], lat = coordinates(coords)[, 2]))
+}
+
+# Fonction pour récupérer les données de l'API pour les logements existants
+get_data_69_existants <- function() {
+  base_url <- "https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-logements-existants/lines"
+  all_data <- data.frame()
+  page <- 1
+  page_size <- 10000
+  has_more_data <- TRUE
+  
+  while (has_more_data) {
+    params <- list(
+      page = page,
+      size = page_size,
+      select = "N°DPE,Etiquette_DPE,Date_réception_DPE,Code_postal_(BAN),Surface_habitable_logement,Coût_chauffage,Coordonnée_cartographique_X_(BAN),Coordonnée_cartographique_Y_(BAN)",
+      q = "69*",  # Filtrer les codes postaux commençant par 69
+      q_fields = "Code_postal_(BAN)"  # Champ spécifique à filtrer
+    )
+    
+    url_encoded <- modify_url(base_url, query = params)
+    response <- GET(url_encoded)
+    
+    if (status_code(response) == 200) {
+      data_json <- content(response, "text")
+      df_page <- fromJSON(data_json)$result
+      if (!is.null(df_page) && nrow(df_page) > 0) {
+        all_data <- rbind(all_data, df_page)
+      }
+      if (nrow(df_page) < page_size) {
+        has_more_data <- FALSE
+      } else {
+        page <- page + 1
+      }
+    } else {
+      has_more_data <- FALSE
+    }
+  }
+  return(all_data)
+}
+
+# Fonction pour récupérer les données de l'API pour les logements neufs
+get_data_69_neufs <- function() {
+  base_url <- "https://data.ademe.fr/data-fair/api/v1/datasets/dpe-v2-logements-neufs/lines"
+  all_data <- data.frame()
+  page <- 1
+  page_size <- 1000
+  has_more_data <- TRUE
+  
+  while (has_more_data) {
+    params <- list(
+      page = page,
+      size = page_size,
+      select = "N°DPE,Etiquette_DPE,Date_réception_DPE,Code_postal_(BAN),Surface_habitable_logement,Coût_chauffage,Coordonnée_cartographique_X_(BAN),Coordonnée_cartographique_Y_(BAN)",
+      q = "69*",  # Filtrer les codes postaux commençant par 69
+      q_fields = "Code_postal_(BAN)"
+    )
+    
+    url_encoded <- modify_url(base_url, query = params)
+    response <- GET(url_encoded)
+    
+    if (status_code(response) == 200) {
+      data_json <- content(response, "text")
+      df_page <- fromJSON(data_json)$result
+      if (!is.null(df_page) && nrow(df_page) > 0) {
+        all_data <- rbind(all_data, df_page)
+      }
+      if (nrow(df_page) < page_size) {
+        has_more_data <- FALSE
+      } else {
+        page <- page + 1
+      }
+    } else {
+      has_more_data <- FALSE
+    }
+  }
+  return(all_data)
+}
+
+# Récupération des données
+existants_data <- get_data_69_existants()
+neufs_data <- get_data_69_neufs()
+
+# Ajouter la colonne "Logement" pour différencier existants et neufs
+existants_data$Logement <- "ancien"
+neufs_data$Logement <- "neuf"
+
+# Fusionner les données sur les colonnes communes
+colonnes_communes <- intersect(names(existants_data), names(neufs_data))
+merged_data <- rbind(existants_data[, colonnes_communes], neufs_data[, colonnes_communes])
+
+# Conversion des coordonnées Lambert-93 en WGS84 pour les visualisations
+coords <- convert_lambert93_to_wgs84(merged_data$`Coordonnée_cartographique_X_(BAN)`, merged_data$`Coordonnée_cartographique_Y_(BAN)`)
+merged_data$lon <- coords$lon
+merged_data$lat <- coords$lat
+
+# Aperçu des données
+head(merged_data)
+```
+
+# Synthèse des Indicateurs Clés de Performance (KPI)
+
+<div class="kpi-section">
+Les indicateurs clés de performance (KPI) suivants fournissent une vue d'ensemble des logements dans le département 69. Ces KPI incluent le nombre total de logements, la proportion de logements anciens et neufs, ainsi que l'étiquette DPE la plus fréquente.
+</div>
+
+```{r kpi, echo=FALSE}
+# Calcul des KPI
+context_data <- function(df) {
+  total_logements <- nrow(df)
+  pct_anciens <- ifelse(total_logements > 0, round((nrow(df %>% filter(Logement == "ancien")) / total_logements) * 100, 1), 0)
+  pct_neufs <- ifelse(total_logements > 0, round((nrow(df %>% filter(Logement == "neuf")) / total_logements) * 100, 1), 0)
+  categorie_majoritaire <- ifelse(total_logements > 0, df %>% count(Etiquette_DPE) %>% top_n(1, n) %>% pull(Etiquette_DPE), "Aucune")
+  
+  list(
+    total_logements = total_logements,
+    pct_anciens = pct_anciens,
+    pct_neufs = pct_neufs,
+    categorie_majoritaire = categorie_majoritaire
+  )
+}
+
+# Affichage des KPI sous forme de tableau
+kpi <- context_data(merged_data)
+kable(data.frame(
+  Indicateurs = c("Total de logements", "Pourcentage de logements anciens", "Pourcentage de logements neufs", "Catégorie DPE majoritaire"),
+  Valeurs = c(kpi$total_logements, paste(kpi$pct_anciens, "%"), paste(kpi$pct_neufs, "%"), kpi$categorie_majoritaire)
+), caption = "Tableau récapitulatif des indicateurs clés de performance des logements.", align = "c")
+```
+
+# Analyse des Performances Énergétiques
+
+<div class="energy-analysis">
+Dans cette section, nous analysons les performances énergétiques des logements en fonction de l'étiquette DPE, du type de logement (ancien ou neuf), et de la surface habitable.
+</div>
+
+## 4.1 Répartition des coûts énergétiques selon l'étiquette DPE
+
+<div class="energy-cost-analysis">
+Le graphique ci-dessous présente la répartition des coûts de chauffage en fonction de l'étiquette DPE, permettant de comparer les performances énergétiques des logements anciens et neufs.
+</div>
+
+![Coût du chauffage selon l'étiquette DPE](https://files.oaiusercontent.com/file-uuvhtVnkzQxZRLTUOtknRWVn?se=2024-10-14T20%3A32%3A54Z&sp=r&sv=2024-08-04&sr=b&rscc=max-age%3D299%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Dimage.png&sig=dnuVLGqffa/kT8%2BWr1M7%2B6mirrRK3Yr1rGE5AwAGXiE%3D)
+
+
+**Analyse du Graphique :**
+  
+<div class="graph-analysis">
+Les coûts de chauffage sont significativement plus élevés pour les logements classés F et G, indiquant une très faible performance énergétique. En revanche, les logements neufs ont une meilleure efficacité, avec des coûts de chauffage généralement plus bas comparés aux logements anciens. Cela souligne l'importance des nouvelles normes de construction qui favorisent l'efficacité énergétique. Pour les logements anciens, une attention particulière doit être portée sur la rénovation afin de réduire ces coûts.
+</div>
+
+## 4.2 Corrélation entre la surface habitable et le coût du chauffage
+
+<div class="correlation-analysis">
+Nous cherchons ensuite à comprendre la relation entre la surface habitable et le coût du chauffage pour les logements analysés. Le corrélogramme ci-dessous montre la force de cette relation.
+</div>
+
+```{r correlation_plot, echo=FALSE}
+# Calcul et visualisation de la corrélation
+merged_data <- merged_data %>% mutate(Surface_habitable_logement = as.numeric(Surface_habitable_logement), Coût_chauffage = as.numeric(Coût_chauffage))
+cor_matrix <- cor(merged_data %>% select(Surface_habitable_logement, Coût_chauffage), use = "complete.obs")
+corrplot(cor_matrix, method = "circle", tl.col = "black", tl.srt = 45, title = "Corrélogramme entre la surface habitable et le coût du chauffage", mar = c(0,0,1,0))
+```
+
+**Analyse du Corrélogramme :**
+  
+<div class="corr-analysis">
+La corrélation entre la surface habitable et le coût du chauffage est positive, ce qui signifie que les logements avec une plus grande surface ont tendance à avoir des coûts de chauffage plus élevés. Ce résultat est intuitivement attendu, car une plus grande surface nécessite plus d'énergie pour être chauffée. Cependant, il est important de noter que la corrélation n'est pas parfaite, ce qui indique que d'autres facteurs, tels que l'isolation et le système de chauffage, jouent également un rôle majeur. Ces informations peuvent aider à cibler des stratégies de rénovation, notamment pour les grands logements avec des étiquettes énergétiques faibles.
+</div>
+
+# 5 Visualisation Géographique des Logements
+
+<div class="geo-visual">
+Nous utilisons une carte interactive pour visualiser la répartition des logements dans le département 69 en fonction de leur localisation géographique et de leur étiquette DPE.
+</div>
+
+```{r leaflet_map, echo=FALSE}
+# Visualisation des logements sur une carte
+leaflet(merged_data) %>%
+  addTiles() %>%
+  setView(lng = 4.85, lat = 45.75, zoom = 10) %>%
+  addCircleMarkers(
+    lng = ~lon, lat = ~lat,
+    color = ~ifelse(Logement == "ancien", "#E69F00", "#56B4E9"),
+    popup = ~paste("<strong>Étiquette DPE:</strong>", Etiquette_DPE, "<br><strong>Coût de chauffage:</strong>", Coût_chauffage, "€<br><strong>Surface habitable:</strong>", Surface_habitable_logement, "m²"),
+    radius = 5, fillOpacity = 0.7, stroke = FALSE, clusterOptions = markerClusterOptions()
+  )
+```
+
+# 6 Étude Statistique : Deux Problématiques Spécifiques
+
+## 6.1 Problématique 1 : Quels types de logements nécessitent le plus de rénovation énergétique ?
+
+<div class="problem-analysis">
+Pour répondre à cette question, nous avons analysé la proportion de logements classés F et G en fonction de leur type (ancien ou neuf).
+</div>
+
+```{r renovation_analysis, echo=FALSE}
+# Analyse des logements nécessitant une rénovation énergétique
+logements_fg <- merged_data %>% filter(Etiquette_DPE %in% c("F", "G")) %>% count(Logement)
+kable(logements_fg, caption = "Nombre de logements classés F et G nécessitant une rénovation énergétique, par type de logement.", align = "c")
+```
+
+**Interprétation :**
+
+<div class="interpretation">
+Les logements anciens sont surreprésentés parmi ceux classés F et G, indiquant un besoin urgent de rénovation énergétique pour cette catégorie afin de réduire les coûts énergétiques et les émissions de CO2. Cette constatation renforce l'idée que des politiques publiques devraient encourager la rénovation des bâtiments anciens pour améliorer leur performance énergétique. La priorisation des aides pour la rénovation des logements anciens pourrait permettre une amélioration significative de l'efficacité énergétique globale.
+</div>
+
+## 6.2 Problématique 2 : Les logements neufs sont-ils systématiquement plus économiques en termes de coûts de chauffage ?
+
+<div class="problem-analysis">
+Pour explorer cette problématique, nous avons comparé la distribution des coûts de chauffage des logements anciens et neufs.
+</div>
+
+```{r cost_distribution, echo=FALSE}
+# Distribution des coûts de chauffage par type de logement
+ggplot(merged_data, aes(x = Logement, y = Coût_chauffage, fill = Logement)) +
+  geom_violin(trim = FALSE) +
+  coord_cartesian(ylim = c(0, 20000)) +  # Ajuster l'axe des y pour mieux visualiser
+  labs(title = "Distribution des coûts de chauffage par type de logement", x = "Type de logement", y = "Coût du chauffage (€)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold"), legend.position = "top") +
+  scale_fill_manual(values = c("ancien" = "#E69F00", "neuf" = "#56B4E9"))
+```
+
+**Analyse du Graphique :**
+
+<div class="graph-analysis">
+Les logements neufs ont une distribution de coûts de chauffage plus resserrée, avec des coûts en moyenne plus bas que ceux des logements anciens. Toutefois, certains logements neufs présentent des coûts élevés, indiquant des variations possibles dans la qualité de la construction ou l'efficacité des systèmes de chauffage. Ces résultats montrent que même parmi les logements neufs, des améliorations sont nécessaires pour garantir une performance énergétique optimale. Cela suggère que des contrôles de qualité plus stricts et des normes énergétiques élevées doivent être mis en œuvre pour tous les nouveaux bâtiments.
+</div>
+
+# Conclusion
+
+<div class="conclusion">
+Cette étude a permis de :
+
+- Mettre en lumière la répartition des coûts énergétiques en fonction de l'étiquette DPE. Les logements avec une étiquette DPE basse (F ou G) présentent des coûts énergétiques plus élevés, nécessitant des actions correctives urgentes.
+- Souligner la corrélation entre la surface habitable et le coût du chauffage, une relation positive qui suggère que plus la surface est grande, plus le coût du chauffage est élevé. Des solutions comme une isolation plus efficace pourraient être envisagées pour atténuer cet effet.
+- Visualiser la répartition géographique des logements, mettant en évidence des zones à cibler en priorité pour des interventions énergétiques.
+- Identifier que les logements anciens sont les principaux candidats pour des rénovations énergétiques urgentes.
+
+Les résultats de cette analyse soulignent l'importance de promouvoir des politiques de rénovation énergétique, en particulier pour les logements classés F et G, afin de réduire les coûts énergétiques et les émissions de CO2. De plus, bien que les logements neufs soient généralement plus efficaces, des efforts doivent être faits pour uniformiser la qualité énergétique et garantir des coûts de chauffage faibles pour tous les nouveaux bâtiments.
+</div>
