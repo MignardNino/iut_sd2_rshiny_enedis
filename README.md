@@ -6,6 +6,10 @@ Suivi du projet sur les DPE des logements du Rhône
 ### Description
 Ce dépôt contient tout le nécessaire pour installer et exécuter une application **Shiny**. L'application permet de visualiser des données et est accompagnée de fichiers CSS pour personnaliser son apparence. Vous trouverez également des documents techniques et fonctionnels pour mieux comprendre son fonctionnement.
 
+### Code d'accés de l'App
+Username : `shiny`
+Passeword : `azerty`
+
 ### Structure du dépôt
 
 - `App_RShiny_installation/`: Dossier complet d'installation
