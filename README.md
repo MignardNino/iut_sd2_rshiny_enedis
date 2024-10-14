@@ -32,7 +32,4 @@ Passeword : `azerty`
 ### Prérequis
 - **R** (version ≥ 4.0)
 - **RStudio** (recommandé)
-- Les packages R requis sont spécifiés dans le fichier `AppShiny_Packages.R`. Pour les installer, exécutez simplement ce script dans R :
-
-```r
-source('AppShiny_Packages.R')
+- Les packages R requis sont spécifiés dans le fichier `AppShiny_Packages.R`.
