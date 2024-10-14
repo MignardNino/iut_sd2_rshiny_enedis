@@ -21,6 +21,9 @@ Ce dépôt contient tout le nécessaire pour installer et exécuter une applicat
   - `Documentation technique de l'application.pdf`: Documentation technique détaillant la structure du code et les technologies utilisées.
 
 - `README.md`: Ce fichier décrivant l'application et fournissant les instructions d'installation.
+  
+- `URL de l'App`: Ce fichier permet d'acceder a l'App via un URL.
+
 
 ### Prérequis
 - **R** (version ≥ 4.0)
